@@ -2,7 +2,9 @@
   "name": "control-room",
   "version": "0.1.0",
   "description": "Workday for AI Agents — open-source dashboard for managing and monitoring your AI agent workforce",
-  "private": true,
+  "bin": {
+    "control-room": "./bin/control-room.js"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "npx tsx scripts/scan-agents.ts && next build",

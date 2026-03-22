@@ -1,49 +1,68 @@
 # Control Room
 
-**Workday for AI Agents** — an open-source dashboard to manage, monitor, and visualize your AI agent workforce.
-
-![Control Room Dashboard](https://via.placeholder.com/1200x600/6366f1/ffffff?text=Control+Room+Dashboard)
-
-## Features
-
-- **Agent Directory** — Browse all your AI agents in a Workday-style grid with profiles
-- **Agent Profiles** — Each agent has a profile page showing their role, responsibilities, skills, tools, and compensation
-- **Compensation Tracking** — Token usage and estimated cost per agent (input/output breakdown)
-- **Workflow Graph** — Interactive visualization of how agents interact with each other using React Flow
-- **Auto-Discovery** — Scans your project for Claude agents (`.claude/agents/*.md`), OpenAI assistants, LangChain configs, and more
-- **API Log Import** — Import Anthropic or OpenAI usage CSV/JSON exports to populate real cost data
-- **GitHub Pages Deploy** — One-click deploy to a free static site via GitHub Actions
+**Workday for AI Agents** — open-source dashboard to manage, monitor, and visualize your AI agent workforce.
 
 ## Quickstart
 
+Navigate to any project that contains AI agents and run:
+
 ```bash
-# 1. Clone the repository
-git clone https://github.com/whisky-willis/Control-room.git
-cd Control-room
-
-# 2. Install dependencies
-npm install
-
-# 3. Scan your project for agents (generates src/data/agents.json)
-npm run scan
-
-# 4. Start the dev server
-npm run dev
+cd my-project-with-agents
+npx github:whisky-willis/Control-room
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+That's it. Control Room will:
+1. Scan your directory for agents
+2. Start a local dashboard at `http://localhost:3000`
+3. Open your browser automatically
 
-## Configuration
+No config file needed. No setup. It just works.
 
-Edit `control-room.config.json` in the root of your project:
+---
+
+## What it detects
+
+| Format | Detected by |
+|--------|-------------|
+| Claude sub-agents | `.claude/agents/*.md` |
+| Claude main config | `CLAUDE.md` |
+| OpenAI assistants | `openai-assistants.json` |
+| LangChain agents | `*.agent.yaml` / `*.agent.yml` |
+| Generic agents | Any `.md` with `agent: true` frontmatter |
+
+---
+
+## What you get
+
+### Dashboard
+Overview with total agents, token usage, estimated cost, and active workflows.
+
+### Agent Directory
+Workday-style grid of all your agents — role, skills, model, and cost at a glance.
+
+### Agent Profiles
+Full profile per agent:
+- **Core Responsibilities** — extracted from the system prompt
+- **Compensation** — token usage breakdown (input/output) and estimated USD cost
+- **Skills & Tools** — detected capabilities
+- **Workflows** — which pipelines this agent participates in
+
+### Workflow Graph
+Interactive canvas showing how your agents connect and pass data to each other.
+
+---
+
+## Optional config
+
+If you want to customize anything, add a `control-room.config.json` to your project root:
 
 ```json
 {
   "scanPaths": ["."],
   "defaultModel": "claude-sonnet-4-6",
   "agents": {
-    "my-agent-id": {
-      "role": "Custom Role Override",
+    "my-agent": {
+      "role": "Custom Role",
       "compensation": {
         "inputTokens": 500000,
         "outputTokens": 150000
@@ -54,7 +73,7 @@ Edit `control-room.config.json` in the root of your project:
     {
       "id": "my-pipeline",
       "name": "My Pipeline",
-      "description": "Description of what this workflow does",
+      "description": "What this workflow does",
       "agents": ["agent-one", "agent-two"],
       "edges": [
         { "from": "agent-one", "to": "agent-two", "label": "passes output" }
@@ -64,32 +83,36 @@ Edit `control-room.config.json` in the root of your project:
 }
 ```
 
-## Importing API Usage Logs
+Control Room will pick this up automatically on the next run.
 
-### Anthropic Console
-1. Go to [console.anthropic.com](https://console.anthropic.com) → Usage → Export CSV
-2. Run: `npm run import-usage -- --file usage.csv`
+---
 
-### OpenAI Platform
-1. Go to [platform.openai.com](https://platform.openai.com) → Usage → Export
-2. Run: `npm run import-usage -- --file usage.json --format openai`
+## Import API usage logs
 
-### Target a specific agent
+Populate real token/cost data from your API provider:
+
 ```bash
-npm run import-usage -- --file usage.csv --agent my-agent-id
+# Anthropic Console → Usage → Export CSV
+npx github:whisky-willis/Control-room import --file usage.csv
+
+# OpenAI Platform → Usage → Export
+npx github:whisky-willis/Control-room import --file usage.json --format openai
 ```
 
-## Supported Agent Formats
+---
 
-| Format | Detection |
-|--------|-----------|
-| Claude sub-agents | `.claude/agents/*.md` with frontmatter |
-| Claude main config | `CLAUDE.md` |
-| OpenAI assistants | `openai-assistants.json` |
-| LangChain agents | `*.agent.yaml` or `*.agent.yml` |
-| Generic | Any `.md` with `agent: true` frontmatter |
+## Deploy your own dashboard to GitHub Pages
 
-### Claude Agent Format
+To get a permanent shareable URL for your agent dashboard:
+
+1. Fork this repo
+2. Go to **Settings → Pages → Source: GitHub Actions**
+3. Add your agents repo as a second checkout in `.github/workflows/deploy.yml`
+4. Push to `main` — auto-deploys to `https://<you>.github.io/Control-room/`
+
+---
+
+## Agent file format (Claude)
 
 ```markdown
 ---
@@ -108,22 +131,13 @@ You are an expert at...
 - Task two
 ```
 
-## Deploy to GitHub Pages
+---
 
-1. Push your repo to GitHub
-2. Go to **Settings → Pages** and set source to **GitHub Actions**
-3. Push to `main` — the workflow builds and deploys automatically
+## Tech stack
 
-Your dashboard will be live at `https://<username>.github.io/<repo-name>/`
-
-## Tech Stack
-
-- [Next.js 14](https://nextjs.org) with App Router (static export)
-- [TypeScript](https://typescriptlang.org)
-- [Tailwind CSS](https://tailwindcss.com)
+- [Next.js 14](https://nextjs.org) · TypeScript · Tailwind CSS
 - [React Flow](https://reactflow.dev) for workflow graphs
 - [Recharts](https://recharts.org) for token usage charts
-- [gray-matter](https://github.com/jonschlinkert/gray-matter) for frontmatter parsing
 
 ## License
 
