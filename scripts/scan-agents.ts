@@ -191,9 +191,11 @@ async function main() {
     const base = path.resolve(root, scanPath)
 
     // 1. Claude sub-agents (.claude/agents/*.md)
+    // dot:true is required so glob traverses hidden directories like .claude/
     const claudeAgentFiles = await glob('**/.claude/agents/*.md', {
       cwd: base,
       absolute: true,
+      dot: true,
       ignore: ['**/node_modules/**'],
     })
     for (const f of claudeAgentFiles) {
