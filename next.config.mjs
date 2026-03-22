@@ -10,6 +10,10 @@ const nextConfig = {
     unoptimized: true,
   },
   trailingSlash: true,
+  // When run via npx, source files live inside node_modules/control-room/
+  // next-swc-loader skips transpilation for node_modules by default, which
+  // breaks TypeScript parsing. transpilePackages forces SWC to process them.
+  transpilePackages: ['control-room'],
 }
 
 export default nextConfig
