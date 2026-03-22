@@ -1,0 +1,42 @@
+{
+  "_comment": "Control Room configuration. Run 'npm run scan' to discover agents in scanPaths.",
+  "scanPaths": ["."],
+  "defaultModel": "claude-sonnet-4-6",
+  "workflows": [
+    {
+      "id": "content-pipeline",
+      "name": "Content Creation Pipeline",
+      "description": "Research, write, and refine content collaboratively",
+      "agents": ["orchestrator", "research-agent", "writer-agent"],
+      "edges": [
+        { "from": "orchestrator", "to": "research-agent", "label": "delegates research task" },
+        { "from": "research-agent", "to": "orchestrator", "label": "returns research notes" },
+        { "from": "orchestrator", "to": "writer-agent", "label": "passes brief + research" },
+        { "from": "writer-agent", "to": "orchestrator", "label": "submits draft" }
+      ]
+    },
+    {
+      "id": "code-review-pipeline",
+      "name": "Code Review Pipeline",
+      "description": "Automated code review with documentation updates",
+      "agents": ["orchestrator", "code-agent", "writer-agent"],
+      "edges": [
+        { "from": "orchestrator", "to": "code-agent", "label": "sends code for review" },
+        { "from": "code-agent", "to": "writer-agent", "label": "requests doc update" },
+        { "from": "writer-agent", "to": "orchestrator", "label": "returns updated docs" },
+        { "from": "code-agent", "to": "orchestrator", "label": "review complete" }
+      ]
+    },
+    {
+      "id": "research-to-code",
+      "name": "Research-to-Implementation",
+      "description": "Research a solution then implement it in code",
+      "agents": ["orchestrator", "research-agent", "code-agent"],
+      "edges": [
+        { "from": "orchestrator", "to": "research-agent", "label": "scopes research" },
+        { "from": "research-agent", "to": "code-agent", "label": "shares approach" },
+        { "from": "code-agent", "to": "orchestrator", "label": "implementation ready" }
+      ]
+    }
+  ]
+}

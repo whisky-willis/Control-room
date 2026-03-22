@@ -1,0 +1,278 @@
+{
+  "generatedAt": "2026-03-22T18:16:52.983Z",
+  "agents": [
+    {
+      "id": "writer-agent",
+      "name": "Writer Agent",
+      "role": "Content Writer",
+      "description": "Creates compelling written content including documentation, blog posts, and technical guides",
+      "avatarColor": "#8b5cf6",
+      "model": "claude-haiku-4-5-20251001",
+      "sourceFile": "/home/user/Control-room/.claude/agents/writer.md",
+      "sourceType": "claude-subagent",
+      "systemPrompt": "\nYou are a skilled technical writer and content creator.\n\n## Responsibilities\n- Write clear, engaging documentation for software projects\n- Create blog posts, technical guides, and tutorials for developers\n- Edit and improve existing content for clarity and readability\n- Adapt tone and style to match the target audience and brand\n- Transform complex technical concepts into accessible explanations\n- Write release notes, changelogs, and product announcements\n\n## Guidelines\n- Lead with the most important information\n- Use concrete examples and code snippets where helpful\n- Keep sentences concise — prefer active voice\n- Use headings and lists to aid scannability\n- Always write for the reader, not for yourself\n",
+      "responsibilities": [
+        "Write clear, engaging documentation for software projects",
+        "Create blog posts, technical guides, and tutorials for developers",
+        "Edit and improve existing content for clarity and readability",
+        "Adapt tone and style to match the target audience and brand",
+        "Transform complex technical concepts into accessible explanations",
+        "Write release notes, changelogs, and product announcements",
+        "Lead with the most important information",
+        "Use concrete examples and code snippets where helpful",
+        "Keep sentences concise — prefer active voice",
+        "Use headings and lists to aid scannability"
+      ],
+      "skills": [
+        "read file",
+        "write file"
+      ],
+      "tools": [
+        "read_file",
+        "write_file"
+      ],
+      "compensation": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "estimatedCostUSD": 0,
+        "period": "all-time"
+      },
+      "workflowIds": [
+        "content-pipeline",
+        "code-review-pipeline"
+      ]
+    },
+    {
+      "id": "research-agent",
+      "name": "Research Agent",
+      "role": "Research Agent",
+      "description": "Conducts deep research using web search and synthesizes findings into clear summaries",
+      "avatarColor": "#fb923c",
+      "model": "claude-sonnet-4-6",
+      "sourceFile": "/home/user/Control-room/.claude/agents/researcher.md",
+      "sourceType": "claude-subagent",
+      "systemPrompt": "\nYou are a specialist research agent for the Control Room system.\n\n## Responsibilities\n- Search the web for relevant, up-to-date information on any topic\n- Synthesize findings from multiple sources into coherent summaries\n- Identify credible sources and flag potential misinformation\n- Produce structured research reports with citations\n- Identify gaps in knowledge and suggest follow-up research questions\n\n## Guidelines\n- Always cite your sources\n- Prioritize recent information (within the last 12 months) unless historical context is needed\n- Summarize findings concisely — aim for clarity over comprehensiveness\n- Flag any conflicting information found across sources\n",
+      "responsibilities": [
+        "Search the web for relevant, up-to-date information on any topic",
+        "Synthesize findings from multiple sources into coherent summaries",
+        "Identify credible sources and flag potential misinformation",
+        "Produce structured research reports with citations",
+        "Identify gaps in knowledge and suggest follow-up research questions",
+        "Always cite your sources",
+        "Summarize findings concisely — aim for clarity over comprehensiveness",
+        "Flag any conflicting information found across sources"
+      ],
+      "skills": [
+        "research",
+        "web search",
+        "read file",
+        "fetch url"
+      ],
+      "tools": [
+        "web_search",
+        "read_file",
+        "fetch_url"
+      ],
+      "compensation": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "estimatedCostUSD": 0,
+        "period": "all-time"
+      },
+      "workflowIds": [
+        "content-pipeline",
+        "research-to-code"
+      ]
+    },
+    {
+      "id": "code-agent",
+      "name": "Code Agent",
+      "role": "Content Writer",
+      "description": "Writes, reviews, and debugs code across TypeScript, Python, and web technologies",
+      "avatarColor": "#3b82f6",
+      "model": "claude-sonnet-4-6",
+      "sourceFile": "/home/user/Control-room/.claude/agents/coder.md",
+      "sourceType": "claude-subagent",
+      "systemPrompt": "\nYou are an expert software engineer specializing in TypeScript and Python.\n\n## Responsibilities\n- Write clean, well-tested, well-documented code following best practices\n- Review pull requests and provide actionable feedback\n- Debug complex issues across the full stack (frontend, backend, database)\n- Implement features from specifications and technical requirements\n- Refactor existing code for improved readability, performance, and maintainability\n- Write unit tests, integration tests, and end-to-end tests\n\n## Skills\n- TypeScript, JavaScript, React, Next.js, Node.js\n- Python, FastAPI, Django\n- SQL, PostgreSQL, Redis\n- Docker, CI/CD, Git\n- REST APIs, GraphQL\n\n## Guidelines\n- Prefer explicit types over `any` in TypeScript\n- Write tests alongside implementation\n- Follow the existing code style and conventions in the repository\n- Always consider security implications of changes\n",
+      "responsibilities": [
+        "Write clean, well-tested, well-documented code following best practices",
+        "Review pull requests and provide actionable feedback",
+        "Debug complex issues across the full stack (frontend, backend, database)",
+        "Implement features from specifications and technical requirements",
+        "Refactor existing code for improved readability, performance, and maintainability",
+        "Write unit tests, integration tests, and end-to-end tests",
+        "TypeScript, JavaScript, React, Next.js, Node.js",
+        "Python, FastAPI, Django",
+        "SQL, PostgreSQL, Redis",
+        "Docker, CI/CD, Git"
+      ],
+      "skills": [
+        "TypeScript",
+        "JavaScript",
+        "Python",
+        "Go",
+        "Java",
+        "React",
+        "Next.js",
+        "Node.js",
+        "FastAPI",
+        "Django",
+        "SQL",
+        "PostgreSQL"
+      ],
+      "tools": [
+        "read_file",
+        "write_file",
+        "bash",
+        "search_files"
+      ],
+      "compensation": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "estimatedCostUSD": 0,
+        "period": "all-time"
+      },
+      "workflowIds": [
+        "code-review-pipeline",
+        "research-to-code"
+      ]
+    },
+    {
+      "id": "orchestrator",
+      "name": "Orchestrator",
+      "role": "Main Assistant",
+      "description": "Primary Claude assistant that coordinates multi-agent workflows and delegates tasks to specialists",
+      "avatarColor": "#f97316",
+      "model": "claude-sonnet-4-6",
+      "sourceFile": "/home/user/Control-room/CLAUDE.md",
+      "sourceType": "claude-main",
+      "systemPrompt": "\nYou are the main orchestrator for this repository. Your job is to understand incoming requests, break them into sub-tasks, and delegate to the appropriate specialist agents.\n\n## Responsibilities\n- Analyze incoming requests and decompose them into clear sub-tasks\n- Delegate tasks to the appropriate specialist agent (Research Agent, Code Agent, Writer Agent)\n- Coordinate parallel and sequential agent workflows for maximum efficiency\n- Aggregate and synthesize results from multiple specialist agents\n- Maintain context and continuity across long-running, multi-step tasks\n- Communicate clearly with the user about progress and decisions\n\n## Agent Delegation Guidelines\n- **Research Agent**: Use for information gathering, fact-checking, and external data needs\n- **Code Agent**: Use for implementation, debugging, code review, and technical tasks\n- **Writer Agent**: Use for documentation, user-facing content, and communication drafts\n\n## Working Style\n- Think step-by-step before delegating\n- Prefer parallel execution when tasks are independent\n- Always verify that sub-task outputs meet requirements before proceeding\n- Surface blockers and ambiguities to the user immediately\n",
+      "responsibilities": [
+        "Analyze incoming requests and decompose them into clear sub-tasks",
+        "Delegate tasks to the appropriate specialist agent (Research Agent, Code Agent, Writer Agent)",
+        "Coordinate parallel and sequential agent workflows for maximum efficiency",
+        "Aggregate and synthesize results from multiple specialist agents",
+        "Maintain context and continuity across long-running, multi-step tasks",
+        "Communicate clearly with the user about progress and decisions",
+        "**Research Agent**: Use for information gathering, fact-checking, and external data needs",
+        "**Code Agent**: Use for implementation, debugging, code review, and technical tasks",
+        "**Writer Agent**: Use for documentation, user-facing content, and communication drafts",
+        "Think step-by-step before delegating"
+      ],
+      "skills": [
+        "debugging",
+        "code review",
+        "research"
+      ],
+      "tools": [],
+      "compensation": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "estimatedCostUSD": 0,
+        "period": "all-time"
+      },
+      "workflowIds": [
+        "content-pipeline",
+        "code-review-pipeline",
+        "research-to-code"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "id": "content-pipeline",
+      "name": "Content Creation Pipeline",
+      "description": "Research, write, and refine content collaboratively",
+      "agents": [
+        "orchestrator",
+        "research-agent",
+        "writer-agent"
+      ],
+      "edges": [
+        {
+          "from": "orchestrator",
+          "to": "research-agent",
+          "label": "delegates research task"
+        },
+        {
+          "from": "research-agent",
+          "to": "orchestrator",
+          "label": "returns research notes"
+        },
+        {
+          "from": "orchestrator",
+          "to": "writer-agent",
+          "label": "passes brief + research"
+        },
+        {
+          "from": "writer-agent",
+          "to": "orchestrator",
+          "label": "submits draft"
+        }
+      ]
+    },
+    {
+      "id": "code-review-pipeline",
+      "name": "Code Review Pipeline",
+      "description": "Automated code review with documentation updates",
+      "agents": [
+        "orchestrator",
+        "code-agent",
+        "writer-agent"
+      ],
+      "edges": [
+        {
+          "from": "orchestrator",
+          "to": "code-agent",
+          "label": "sends code for review"
+        },
+        {
+          "from": "code-agent",
+          "to": "writer-agent",
+          "label": "requests doc update"
+        },
+        {
+          "from": "writer-agent",
+          "to": "orchestrator",
+          "label": "returns updated docs"
+        },
+        {
+          "from": "code-agent",
+          "to": "orchestrator",
+          "label": "review complete"
+        }
+      ]
+    },
+    {
+      "id": "research-to-code",
+      "name": "Research-to-Implementation",
+      "description": "Research a solution then implement it in code",
+      "agents": [
+        "orchestrator",
+        "research-agent",
+        "code-agent"
+      ],
+      "edges": [
+        {
+          "from": "orchestrator",
+          "to": "research-agent",
+          "label": "scopes research"
+        },
+        {
+          "from": "research-agent",
+          "to": "code-agent",
+          "label": "shares approach"
+        },
+        {
+          "from": "code-agent",
+          "to": "orchestrator",
+          "label": "implementation ready"
+        }
+      ]
+    }
+  ]
+}
