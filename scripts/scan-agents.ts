@@ -140,6 +140,96 @@ function parseOpenAIConfig(filePath: string, defaultModel: string): Agent[] {
   }
 }
 
+// ─── code file parsers ────────────────────────────────────────────────────────
+
+/**
+ * Extracts a string value from a code block for a given key.
+ * Handles Python kwargs (key="val"), JS object props (key: "val"),
+ * and Python triple-quoted strings (key="""val""").
+ */
+function extractStringValue(text: string, key: string): string | undefined {
+  const patterns = [
+    // key="""...""" or key='''...''' (Python multiline - grab first non-empty line)
+    new RegExp(`${key}\\s*=\\s*"""([\\s\\S]*?)"""`, 's'),
+    new RegExp(`${key}\\s*=\\s*'''([\\s\\S]*?)'''`, 's'),
+    // key="val" or key='val' or key=`val`
+    new RegExp(`${key}\\s*=\\s*["'\`]([^"'\`\\n]{1,300})["'\`]`),
+    // key: "val" or key: 'val' or key: \`val\` (JS object literal)
+    new RegExp(`${key}\\s*:\\s*["'\`]([^"'\`\\n]{1,300})["'\`]`),
+  ]
+  for (const p of patterns) {
+    const m = text.match(p)
+    if (m?.[1]) {
+      // For multiline, return first non-empty line
+      const val = m[1].trim()
+      return val.split('\n').find((l) => l.trim()) || val
+    }
+  }
+  return undefined
+}
+
+/**
+ * Parses an Agent(...) block extracted from a code file.
+ * Returns null if no recognisable name field is found.
+ */
+function parseCodeAgentBlock(block: string, filePath: string, defaultModel: string): Agent | null {
+  const name = extractStringValue(block, 'name') || extractStringValue(block, 'role')
+  if (!name) return null
+
+  const id = slugify(name)
+  const instructions =
+    extractStringValue(block, 'instructions') ||
+    extractStringValue(block, 'system_prompt') ||
+    extractStringValue(block, 'goal') ||
+    ''
+  const description =
+    extractStringValue(block, 'description') ||
+    extractStringValue(block, 'backstory') ||
+    instructions.slice(0, 120)
+  const model = extractStringValue(block, 'model') || defaultModel
+  const tools: string[] = []
+
+  return makeAgent(id, name, inferRole(name, instructions), description, model, filePath, 'generic', instructions, tools)
+}
+
+/**
+ * Scans a Python or JS/TS source file for Agent() / new Agent({}) instantiations
+ * from common frameworks (OpenAI Agents SDK, CrewAI, custom).
+ */
+function parseCodeFile(filePath: string, defaultModel: string): Agent[] {
+  const agents: Agent[] = []
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const ext = path.extname(filePath).toLowerCase()
+    const isPython = ext === '.py'
+
+    // Quick guard: skip files that don't reference Agent at all
+    if (!raw.includes('Agent')) return agents
+
+    // Keywords to locate agent instantiations
+    const keywords = isPython ? ['Agent('] : ['new Agent({', 'Agent({']
+
+    for (const keyword of keywords) {
+      let searchFrom = 0
+      while (true) {
+        const idx = raw.indexOf(keyword, searchFrom)
+        if (idx === -1) break
+
+        // Extract up to 1000 chars starting from the keyword to capture all kwargs
+        const block = raw.slice(idx, idx + 1000)
+        const agent = parseCodeAgentBlock(block, filePath, defaultModel)
+        if (agent && !agents.find((a) => a.id === agent.id)) {
+          agents.push(agent)
+        }
+        searchFrom = idx + keyword.length
+      }
+    }
+  } catch {
+    // skip unreadable files
+  }
+  return agents
+}
+
 function parseLangChainConfig(filePath: string, defaultModel: string): Agent | null {
   try {
     // Basic YAML parsing without a dep — handle simple key: value
@@ -237,7 +327,19 @@ async function main() {
       if (agent && !agentsMap.has(agent.id)) agentsMap.set(agent.id, agent)
     }
 
-    // 5. Generic: .md with "agent:" frontmatter key
+    // 5. Code files: Python / JS / TS with Agent() instantiations
+    const codeFiles = await glob('**/*.{py,ts,tsx,js,mjs}', {
+      cwd: base,
+      absolute: true,
+      ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.next/**', '**/.cache/**'],
+    })
+    for (const f of codeFiles) {
+      for (const agent of parseCodeFile(f, defaultModel)) {
+        if (!agentsMap.has(agent.id)) agentsMap.set(agent.id, agent)
+      }
+    }
+
+    // 6. Generic: .md with "agent:" frontmatter key
     const genericFiles = await glob('**/*.md', {
       cwd: base,
       absolute: true,

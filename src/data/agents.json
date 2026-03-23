@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-22T18:16:52.983Z",
+  "generatedAt": "2026-03-23T00:11:44.966Z",
   "agents": [
     {
       "id": "writer-agent",
@@ -180,6 +180,30 @@
         "code-review-pipeline",
         "research-to-code"
       ]
+    },
+    {
+      "id": "triage-agent",
+      "name": "Triage Agent",
+      "role": "AI Agent",
+      "description": "You handle incoming requests and route them to the right specialist.",
+      "avatarColor": "#84cc16",
+      "model": "gpt-4o",
+      "sourceFile": "/home/user/Control-room/test_agents.py",
+      "sourceType": "generic",
+      "systemPrompt": "You handle incoming requests and route them to the right specialist.",
+      "responsibilities": [
+        "You handle incoming requests and route them to the right specialist"
+      ],
+      "skills": [],
+      "tools": [],
+      "compensation": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "estimatedCostUSD": 0,
+        "period": "all-time"
+      },
+      "workflowIds": []
     }
   ],
   "workflows": [
