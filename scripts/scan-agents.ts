@@ -43,6 +43,73 @@ function loadConfig(root: string): ControlRoomConfig {
   return { scanPaths: ['.'], defaultModel: 'claude-sonnet-4-6' }
 }
 
+function parseCSV(content: string): Record<string, string>[] {
+  const lines = content.trim().split('\n')
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'))
+  return lines.slice(1).map((line) => {
+    const values = line.split(',')
+    return Object.fromEntries(headers.map((h, i) => [h, values[i]?.trim() ?? '']))
+  })
+}
+
+function applyUsageLog(agents: Agent[], usageLogPath: string, root: string): void {
+  const filePath = path.resolve(root, usageLogPath)
+  if (!fs.existsSync(filePath)) {
+    console.warn(`⚠️  usageLogPath not found: ${filePath}`)
+    return
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8')
+  const isJson = filePath.endsWith('.json')
+
+  interface UsageRow { model: string; inputTokens: number; outputTokens: number; costUSD: number; date?: string }
+  let rows: UsageRow[]
+
+  if (isJson) {
+    const data = JSON.parse(content)
+    const items: Record<string, unknown>[] = Array.isArray(data) ? data : (data.data ?? [])
+    rows = items.map((item) => {
+      const inp = (item.n_context_tokens_total as number) || (item.prompt_tokens as number) || 0
+      const out = (item.n_generated_tokens_total as number) || (item.completion_tokens as number) || 0
+      const model = (item.model as string) || 'gpt-4o'
+      return { model, inputTokens: inp, outputTokens: out, costUSD: calculateCost(inp, out, model), date: item.date as string }
+    })
+  } else {
+    rows = parseCSV(content).map((r) => ({
+      model: r.model || 'claude-sonnet-4-6',
+      inputTokens: parseInt(r.input_tokens || r.input_token_count || '0', 10),
+      outputTokens: parseInt(r.output_tokens || r.output_token_count || '0', 10),
+      costUSD: parseFloat(r.cost_usd || r.cost || '0'),
+      date: r.date,
+    }))
+  }
+
+  const totalInput = rows.reduce((s, r) => s + r.inputTokens, 0)
+  const totalOutput = rows.reduce((s, r) => s + r.outputTokens, 0)
+  const totalCost = rows.reduce((s, r) => s + r.costUSD, 0)
+  const agentCount = agents.length || 1
+
+  for (const agent of agents) {
+    const matching = rows.filter(
+      (r) => r.model === agent.model || r.model.startsWith(agent.model.split('-').slice(0, 3).join('-'))
+    )
+    const src = matching.length > 0 ? matching : null
+    const inp = src ? src.reduce((s, r) => s + r.inputTokens, 0) : Math.round(totalInput / agentCount)
+    const out = src ? src.reduce((s, r) => s + r.outputTokens, 0) : Math.round(totalOutput / agentCount)
+    const cost = src ? src.reduce((s, r) => s + r.costUSD, 0) : totalCost / agentCount
+    const date = (src ?? rows)[0]?.date
+    agent.compensation = {
+      inputTokens: inp,
+      outputTokens: out,
+      totalTokens: inp + out,
+      estimatedCostUSD: Math.round(cost * 10000) / 10000,
+      ...(date ? { period: date } : { period: 'all-time' }),
+    }
+  }
+
+  console.log(`   Usage log:    ${usageLogPath} (${rows.length} rows)`)
+}
+
 function makeAgent(
   id: string,
   name: string,
@@ -402,6 +469,11 @@ async function main() {
 
   // If no agents found, write sample data so the UI has something to show
   const finalAgents = agentList.length > 0 ? agentList : generateSampleAgents(defaultModel)
+
+  // Auto-import usage data if configured
+  if (config.usageLogPath) {
+    applyUsageLog(finalAgents, config.usageLogPath, root)
+  }
   const finalWorkflows = workflows.length > 0 ? workflows : generateSampleWorkflows()
 
   const output: AgentsData = {
