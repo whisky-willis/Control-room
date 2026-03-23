@@ -23,3 +23,8 @@ You are the main orchestrator for this repository. Your job is to understand inc
 - Prefer parallel execution when tasks are independent
 - Always verify that sub-task outputs meet requirements before proceeding
 - Surface blockers and ambiguities to the user immediately
+
+## Project Notes
+- Control Room is published via GitHub, not npm. The owner does **not** have an npm account.
+- Install command: `npx github:whisky-willis/Control-room` — no npm registry involved.
+- To get the latest version: `rm -rf ~/.npm/_npx && npx github:whisky-willis/Control-room`
