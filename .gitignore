@@ -11,6 +11,9 @@ next-env.d.ts
 .env.local
 .env.*.local
 
+# TypeScript
+tsconfig.tsbuildinfo
+
 # Misc
 .DS_Store
 *.pem
