@@ -18,6 +18,15 @@ That's it. Control Room will:
 
 No config file needed. No setup. It just works.
 
+### Getting the latest version
+
+`npx` caches GitHub packages locally. If you've run Control Room before and want to pick up updates, clear the cache first:
+
+```bash
+rm -rf ~/.npm/_npx
+npx github:whisky-willis/Control-room
+```
+
 ---
 
 ## What it detects
