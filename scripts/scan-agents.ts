@@ -18,9 +18,11 @@ import matter from 'gray-matter'
 import { calculateCost } from '../src/lib/model-pricing'
 import { extractResponsibilities, extractSkills } from '../src/lib/extract-responsibilities'
 import { getAvatarColor, slugify as _slugify } from '../src/lib/avatar-utils'
+import { parseClaudeLogs } from './parse-claude-logs'
 import type {
   Agent,
   AgentsData,
+  ActivitySession,
   ControlRoomConfig,
   Workflow,
   AgentSourceType,
@@ -41,6 +43,135 @@ function loadConfig(root: string): ControlRoomConfig {
     return JSON.parse(fs.readFileSync(configPath, 'utf8')) as ControlRoomConfig
   }
   return { scanPaths: ['.'], defaultModel: 'claude-sonnet-4-6' }
+}
+
+async function fetchAnthropicUsage(agents: Agent[]): Promise<void> {
+  const adminKey = process.env.ANTHROPIC_ADMIN_KEY
+  if (!adminKey) return
+
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setDate(endDate.getDate() - 30)
+  const fmt = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+
+  interface UsageBucket { model?: string; input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
+  interface UsageResponse { data: UsageBucket[]; has_more: boolean; next_page?: string }
+
+  const byModel: Record<string, { inputTokens: number; outputTokens: number }> = {}
+
+  let page: string | undefined
+  do {
+    const url = new URL('https://api.anthropic.com/v1/organizations/usage_report/messages')
+    url.searchParams.set('starting_at', fmt(startDate))
+    url.searchParams.set('ending_at', fmt(endDate))
+    url.searchParams.set('bucket_width', '1d')
+    url.searchParams.append('group_by[]', 'model')
+    if (page) url.searchParams.set('page', page)
+
+    const res = await fetch(url.toString(), {
+      headers: { 'x-api-key': adminKey, 'anthropic-version': '2023-06-01' },
+    })
+    if (!res.ok) {
+      console.warn(`⚠️  Anthropic usage API returned ${res.status}: ${await res.text()}`)
+      return
+    }
+    const body = await res.json() as UsageResponse
+    for (const bucket of body.data) {
+      const model = bucket.model ?? 'unknown'
+      if (!byModel[model]) byModel[model] = { inputTokens: 0, outputTokens: 0 }
+      byModel[model].inputTokens += (bucket.input_tokens ?? 0) + (bucket.cache_read_input_tokens ?? 0)
+      byModel[model].outputTokens += bucket.output_tokens ?? 0
+    }
+    page = body.has_more ? body.next_page : undefined
+  } while (page)
+
+  const totalInput = Object.values(byModel).reduce((s, r) => s + r.inputTokens, 0)
+  const totalOutput = Object.values(byModel).reduce((s, r) => s + r.outputTokens, 0)
+  const agentCount = agents.length || 1
+
+  for (const agent of agents) {
+    const key = Object.keys(byModel).find(
+      (m) => m === agent.model || m.startsWith(agent.model.split('-').slice(0, 3).join('-'))
+    )
+    const inp = key ? byModel[key].inputTokens : Math.round(totalInput / agentCount)
+    const out = key ? byModel[key].outputTokens : Math.round(totalOutput / agentCount)
+    agent.compensation = {
+      inputTokens: inp,
+      outputTokens: out,
+      totalTokens: inp + out,
+      estimatedCostUSD: Math.round(calculateCost(inp, out, agent.model) * 10000) / 10000,
+      period: 'all-time',
+    }
+  }
+
+  console.log(`   Anthropic API: fetched usage for ${Object.keys(byModel).length} model(s)`)
+}
+
+function parseCSV(content: string): Record<string, string>[] {
+  const lines = content.trim().split('\n')
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'))
+  return lines.slice(1).map((line) => {
+    const values = line.split(',')
+    return Object.fromEntries(headers.map((h, i) => [h, values[i]?.trim() ?? '']))
+  })
+}
+
+function applyUsageLog(agents: Agent[], usageLogPath: string, root: string): void {
+  const filePath = path.resolve(root, usageLogPath)
+  if (!fs.existsSync(filePath)) {
+    console.warn(`⚠️  usageLogPath not found: ${filePath}`)
+    return
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8')
+  const isJson = filePath.endsWith('.json')
+
+  interface UsageRow { model: string; inputTokens: number; outputTokens: number; costUSD: number; date?: string }
+  let rows: UsageRow[]
+
+  if (isJson) {
+    const data = JSON.parse(content)
+    const items: Record<string, unknown>[] = Array.isArray(data) ? data : (data.data ?? [])
+    rows = items.map((item) => {
+      const inp = (item.n_context_tokens_total as number) || (item.prompt_tokens as number) || 0
+      const out = (item.n_generated_tokens_total as number) || (item.completion_tokens as number) || 0
+      const model = (item.model as string) || 'gpt-4o'
+      return { model, inputTokens: inp, outputTokens: out, costUSD: calculateCost(inp, out, model), date: item.date as string }
+    })
+  } else {
+    rows = parseCSV(content).map((r) => ({
+      model: r.model || 'claude-sonnet-4-6',
+      inputTokens: parseInt(r.input_tokens || r.input_token_count || '0', 10),
+      outputTokens: parseInt(r.output_tokens || r.output_token_count || '0', 10),
+      costUSD: parseFloat(r.cost_usd || r.cost || '0'),
+      date: r.date,
+    }))
+  }
+
+  const totalInput = rows.reduce((s, r) => s + r.inputTokens, 0)
+  const totalOutput = rows.reduce((s, r) => s + r.outputTokens, 0)
+  const totalCost = rows.reduce((s, r) => s + r.costUSD, 0)
+  const agentCount = agents.length || 1
+
+  for (const agent of agents) {
+    const matching = rows.filter(
+      (r) => r.model === agent.model || r.model.startsWith(agent.model.split('-').slice(0, 3).join('-'))
+    )
+    const src = matching.length > 0 ? matching : null
+    const inp = src ? src.reduce((s, r) => s + r.inputTokens, 0) : Math.round(totalInput / agentCount)
+    const out = src ? src.reduce((s, r) => s + r.outputTokens, 0) : Math.round(totalOutput / agentCount)
+    const cost = src ? src.reduce((s, r) => s + r.costUSD, 0) : totalCost / agentCount
+    const date = (src ?? rows)[0]?.date
+    agent.compensation = {
+      inputTokens: inp,
+      outputTokens: out,
+      totalTokens: inp + out,
+      estimatedCostUSD: Math.round(cost * 10000) / 10000,
+      ...(date ? { period: date } : { period: 'all-time' }),
+    }
+  }
+
+  console.log(`   Usage log:    ${usageLogPath} (${rows.length} rows)`)
 }
 
 function makeAgent(
@@ -74,7 +205,6 @@ function makeAgent(
       outputTokens: 0,
       totalTokens: 0,
       estimatedCostUSD: 0,
-      period: 'all-time',
     },
     workflowIds: [],
   }
@@ -140,6 +270,96 @@ function parseOpenAIConfig(filePath: string, defaultModel: string): Agent[] {
   }
 }
 
+// ─── code file parsers ────────────────────────────────────────────────────────
+
+/**
+ * Extracts a string value from a code block for a given key.
+ * Handles Python kwargs (key="val"), JS object props (key: "val"),
+ * and Python triple-quoted strings (key="""val""").
+ */
+function extractStringValue(text: string, key: string): string | undefined {
+  const patterns = [
+    // key="""...""" or key='''...''' (Python multiline - grab first non-empty line)
+    new RegExp(`${key}\\s*=\\s*"""([\\s\\S]*?)"""`, 's'),
+    new RegExp(`${key}\\s*=\\s*'''([\\s\\S]*?)'''`, 's'),
+    // key="val" or key='val' or key=`val`
+    new RegExp(`${key}\\s*=\\s*["'\`]([^"'\`\\n]{1,300})["'\`]`),
+    // key: "val" or key: 'val' or key: \`val\` (JS object literal)
+    new RegExp(`${key}\\s*:\\s*["'\`]([^"'\`\\n]{1,300})["'\`]`),
+  ]
+  for (const p of patterns) {
+    const m = text.match(p)
+    if (m?.[1]) {
+      // For multiline, return first non-empty line
+      const val = m[1].trim()
+      return val.split('\n').find((l) => l.trim()) || val
+    }
+  }
+  return undefined
+}
+
+/**
+ * Parses an Agent(...) block extracted from a code file.
+ * Returns null if no recognisable name field is found.
+ */
+function parseCodeAgentBlock(block: string, filePath: string, defaultModel: string): Agent | null {
+  const name = extractStringValue(block, 'name') || extractStringValue(block, 'role')
+  if (!name) return null
+
+  const id = slugify(name)
+  const instructions =
+    extractStringValue(block, 'instructions') ||
+    extractStringValue(block, 'system_prompt') ||
+    extractStringValue(block, 'goal') ||
+    ''
+  const description =
+    extractStringValue(block, 'description') ||
+    extractStringValue(block, 'backstory') ||
+    instructions.slice(0, 120)
+  const model = extractStringValue(block, 'model') || defaultModel
+  const tools: string[] = []
+
+  return makeAgent(id, name, inferRole(name, instructions), description, model, filePath, 'generic', instructions, tools)
+}
+
+/**
+ * Scans a Python or JS/TS source file for Agent() / new Agent({}) instantiations
+ * from common frameworks (OpenAI Agents SDK, CrewAI, custom).
+ */
+function parseCodeFile(filePath: string, defaultModel: string): Agent[] {
+  const agents: Agent[] = []
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const ext = path.extname(filePath).toLowerCase()
+    const isPython = ext === '.py'
+
+    // Quick guard: skip files that don't reference Agent at all
+    if (!raw.includes('Agent')) return agents
+
+    // Keywords to locate agent instantiations
+    const keywords = isPython ? ['Agent('] : ['new Agent({', 'Agent({']
+
+    for (const keyword of keywords) {
+      let searchFrom = 0
+      while (true) {
+        const idx = raw.indexOf(keyword, searchFrom)
+        if (idx === -1) break
+
+        // Extract up to 1000 chars starting from the keyword to capture all kwargs
+        const block = raw.slice(idx, idx + 1000)
+        const agent = parseCodeAgentBlock(block, filePath, defaultModel)
+        if (agent && !agents.find((a) => a.id === agent.id)) {
+          agents.push(agent)
+        }
+        searchFrom = idx + keyword.length
+      }
+    }
+  } catch {
+    // skip unreadable files
+  }
+  return agents
+}
+
 function parseLangChainConfig(filePath: string, defaultModel: string): Agent | null {
   try {
     // Basic YAML parsing without a dep — handle simple key: value
@@ -179,6 +399,78 @@ function inferRole(name: string, content: string): string {
   return 'AI Agent'
 }
 
+// ─── claude log integration ───────────────────────────────────────────────────
+
+function applyClaudeLogs(agents: Agent[], root: string): ActivitySession[] {
+  const logs = parseClaudeLogs(root)
+  if (!logs) return []
+
+  const totalIn = logs.totalInputTokens
+  const totalOut = logs.totalOutputTokens
+
+  if (totalIn === 0 && totalOut === 0) return []
+
+  // Match subagent types to discovered agents by name/role keywords
+  const matchedInputByAgent: Record<string, number> = {}
+  const matchedOutputByAgent: Record<string, number> = {}
+
+  for (const [agentType, usage] of Object.entries(logs.byAgentType)) {
+    const lower = agentType.toLowerCase()
+    const matched = agents.find((a) => {
+      const n = a.name.toLowerCase()
+      const r = a.role.toLowerCase()
+      if (lower.includes('explore') || lower.includes('research')) return n.includes('research') || r.includes('research')
+      if (lower.includes('code') || lower.includes('engineer')) return n.includes('code') || r.includes('code') || r.includes('engineer')
+      if (lower.includes('write') || lower.includes('writer') || lower.includes('content')) return n.includes('writ') || r.includes('writ') || r.includes('content')
+      if (lower.includes('plan')) return r.includes('plan') || r.includes('orchestrat')
+      return false
+    })
+    if (matched) {
+      matchedInputByAgent[matched.id] = (matchedInputByAgent[matched.id] ?? 0) + usage.inputTokens
+      matchedOutputByAgent[matched.id] = (matchedOutputByAgent[matched.id] ?? 0) + usage.outputTokens
+    }
+  }
+
+  const totalMatchedIn = Object.values(matchedInputByAgent).reduce((s, v) => s + v, 0)
+  const totalMatchedOut = Object.values(matchedOutputByAgent).reduce((s, v) => s + v, 0)
+  const remainderIn = Math.max(0, totalIn - totalMatchedIn)
+  const remainderOut = Math.max(0, totalOut - totalMatchedOut)
+
+  // Give remainder to the main/orchestrator agent, or distribute evenly if none
+  const mainAgent = agents.find((a) => a.sourceType === 'claude-main') ?? agents[0]
+
+  for (const agent of agents) {
+    const inp = (matchedInputByAgent[agent.id] ?? 0) + (agent === mainAgent ? remainderIn : 0)
+    const out = (matchedOutputByAgent[agent.id] ?? 0) + (agent === mainAgent ? remainderOut : 0)
+    if (inp === 0 && out === 0) continue
+
+    agent.compensation = {
+      inputTokens: inp,
+      outputTokens: out,
+      totalTokens: inp + out,
+      estimatedCostUSD: Math.round(calculateCost(inp, out, agent.model) * 10000) / 10000,
+      cacheTokens: agent === mainAgent ? logs.totalCacheTokens : undefined,
+      lastActiveAt: logs.lastActiveAt,
+      isActive: logs.isActive,
+      sessionCount: logs.sessions.length,
+      period: 'all-time',
+    }
+  }
+
+  console.log(`   Claude logs:  ${logs.sessions.length} session(s), ${totalIn + totalOut} tokens total`)
+  if (logs.isActive) console.log(`   ⚡ Active session detected`)
+
+  // Build activity feed (most recent 10 sessions)
+  return logs.sessions.slice(0, 10).map((s) => ({
+    sessionId: s.sessionId,
+    lastActiveAt: s.lastActiveAt,
+    isActive: s.isActive,
+    totalTokens: s.inputTokens + s.outputTokens,
+    cacheTokens: s.cacheTokens,
+    agentTypesInvolved: Array.from(new Set(s.subagents.map((sub) => sub.agentType))),
+  }))
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -191,9 +483,11 @@ async function main() {
     const base = path.resolve(root, scanPath)
 
     // 1. Claude sub-agents (.claude/agents/*.md)
+    // dot:true is required so glob traverses hidden directories like .claude/
     const claudeAgentFiles = await glob('**/.claude/agents/*.md', {
       cwd: base,
       absolute: true,
+      dot: true,
       ignore: ['**/node_modules/**'],
     })
     for (const f of claudeAgentFiles) {
@@ -235,7 +529,19 @@ async function main() {
       if (agent && !agentsMap.has(agent.id)) agentsMap.set(agent.id, agent)
     }
 
-    // 5. Generic: .md with "agent:" frontmatter key
+    // 5. Code files: Python / JS / TS with Agent() instantiations
+    const codeFiles = await glob('**/*.{py,ts,tsx,js,mjs}', {
+      cwd: base,
+      absolute: true,
+      ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.next/**', '**/.cache/**'],
+    })
+    for (const f of codeFiles) {
+      for (const agent of parseCodeFile(f, defaultModel)) {
+        if (!agentsMap.has(agent.id)) agentsMap.set(agent.id, agent)
+      }
+    }
+
+    // 6. Generic: .md with "agent:" frontmatter key
     const genericFiles = await glob('**/*.md', {
       cwd: base,
       absolute: true,
@@ -299,12 +605,25 @@ async function main() {
 
   // If no agents found, write sample data so the UI has something to show
   const finalAgents = agentList.length > 0 ? agentList : generateSampleAgents(defaultModel)
+
+  // Auto-import usage data: Claude logs → local file → Anthropic Admin API
+  let recentActivity: ActivitySession[] = []
+  const claudeLogData = applyClaudeLogs(finalAgents, root)
+  if (claudeLogData.length > 0) {
+    recentActivity = claudeLogData
+  } else if (config.usageLogPath) {
+    applyUsageLog(finalAgents, config.usageLogPath, root)
+  } else {
+    await fetchAnthropicUsage(finalAgents)
+  }
+
   const finalWorkflows = workflows.length > 0 ? workflows : generateSampleWorkflows()
 
   const output: AgentsData = {
     generatedAt: new Date().toISOString(),
     agents: finalAgents,
     workflows: finalWorkflows,
+    recentActivity,
   }
 
   const outPath = path.join(root, 'src/data/agents.json')

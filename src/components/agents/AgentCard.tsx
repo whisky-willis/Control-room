@@ -33,9 +33,14 @@ export function AgentCard({ agent }: AgentCardProps) {
           {getInitials(agent.name)}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground group-hover:text-brand-600 transition-colors truncate text-sm">
-            {agent.name}
-          </h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="font-semibold text-foreground group-hover:text-brand-600 transition-colors truncate text-sm">
+              {agent.name}
+            </h3>
+            {agent.compensation.isActive && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" title="Active session" />
+            )}
+          </div>
           <p className="text-xs text-muted-foreground truncate">{agent.role}</p>
           <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.className}`}>
             {badge.label}
