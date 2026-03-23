@@ -74,7 +74,6 @@ function makeAgent(
       outputTokens: 0,
       totalTokens: 0,
       estimatedCostUSD: 0,
-      period: 'all-time',
     },
     workflowIds: [],
   }
