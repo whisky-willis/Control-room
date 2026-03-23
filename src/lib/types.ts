@@ -12,6 +12,23 @@ export interface AgentCompensation {
   estimatedCostUSD: number
   /** e.g. "2025-03" or "all-time" */
   period?: string
+  /** Cache tokens (creation + read) */
+  cacheTokens?: number
+  /** ISO timestamp of most recent session activity */
+  lastActiveAt?: string
+  /** True if a session was active within the last 2 minutes */
+  isActive?: boolean
+  /** Number of Claude Code sessions parsed */
+  sessionCount?: number
+}
+
+export interface ActivitySession {
+  sessionId: string
+  lastActiveAt: string
+  isActive: boolean
+  totalTokens: number
+  cacheTokens: number
+  agentTypesInvolved: string[]
 }
 
 export interface Agent {
@@ -77,4 +94,5 @@ export interface AgentsData {
   generatedAt: string
   agents: Agent[]
   workflows: Workflow[]
+  recentActivity?: ActivitySession[]
 }

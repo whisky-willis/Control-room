@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-23T00:11:44.966Z",
+  "generatedAt": "2026-03-23T01:40:06.045Z",
   "agents": [
     {
       "id": "writer-agent",
@@ -35,8 +35,7 @@
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
-        "estimatedCostUSD": 0,
-        "period": "all-time"
+        "estimatedCostUSD": 0
       },
       "workflowIds": [
         "content-pipeline",
@@ -75,10 +74,13 @@
         "fetch_url"
       ],
       "compensation": {
-        "inputTokens": 0,
-        "outputTokens": 0,
-        "totalTokens": 0,
-        "estimatedCostUSD": 0,
+        "inputTokens": 21567,
+        "outputTokens": 6101,
+        "totalTokens": 27668,
+        "estimatedCostUSD": 0.1562,
+        "lastActiveAt": "2026-03-23T01:40:02.769Z",
+        "isActive": true,
+        "sessionCount": 8,
         "period": "all-time"
       },
       "workflowIds": [
@@ -132,8 +134,7 @@
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
-        "estimatedCostUSD": 0,
-        "period": "all-time"
+        "estimatedCostUSD": 0
       },
       "workflowIds": [
         "code-review-pipeline",
@@ -170,9 +171,13 @@
       "tools": [],
       "compensation": {
         "inputTokens": 0,
-        "outputTokens": 0,
-        "totalTokens": 0,
-        "estimatedCostUSD": 0,
+        "outputTokens": 154431,
+        "totalTokens": 154431,
+        "estimatedCostUSD": 2.3165,
+        "cacheTokens": 102564294,
+        "lastActiveAt": "2026-03-23T01:40:02.769Z",
+        "isActive": true,
+        "sessionCount": 8,
         "period": "all-time"
       },
       "workflowIds": [
@@ -180,30 +185,6 @@
         "code-review-pipeline",
         "research-to-code"
       ]
-    },
-    {
-      "id": "triage-agent",
-      "name": "Triage Agent",
-      "role": "AI Agent",
-      "description": "You handle incoming requests and route them to the right specialist.",
-      "avatarColor": "#84cc16",
-      "model": "gpt-4o",
-      "sourceFile": "/home/user/Control-room/test_agents.py",
-      "sourceType": "generic",
-      "systemPrompt": "You handle incoming requests and route them to the right specialist.",
-      "responsibilities": [
-        "You handle incoming requests and route them to the right specialist"
-      ],
-      "skills": [],
-      "tools": [],
-      "compensation": {
-        "inputTokens": 0,
-        "outputTokens": 0,
-        "totalTokens": 0,
-        "estimatedCostUSD": 0,
-        "period": "all-time"
-      },
-      "workflowIds": []
     }
   ],
   "workflows": [
@@ -296,6 +277,83 @@
           "to": "orchestrator",
           "label": "implementation ready"
         }
+      ]
+    }
+  ],
+  "recentActivity": [
+    {
+      "sessionId": "cfd774d9-39b6-4d1d-be6b-ae9c25ec5461",
+      "lastActiveAt": "2026-03-23T01:40:02.769Z",
+      "isActive": true,
+      "totalTokens": 43301,
+      "cacheTokens": 20668434,
+      "agentTypesInvolved": [
+        "Explore"
+      ]
+    },
+    {
+      "sessionId": "96ef21d3-af57-4bdd-8032-5c60877763b8",
+      "lastActiveAt": "2026-03-23T01:18:43.268Z",
+      "isActive": false,
+      "totalTokens": 30342,
+      "cacheTokens": 17533337,
+      "agentTypesInvolved": [
+        "Explore"
+      ]
+    },
+    {
+      "sessionId": "39fac8b5-fcdc-4ecc-8407-6bf5f15eb1d1",
+      "lastActiveAt": "2026-03-23T00:22:37.459Z",
+      "isActive": false,
+      "totalTokens": 24310,
+      "cacheTokens": 15317642,
+      "agentTypesInvolved": []
+    },
+    {
+      "sessionId": "4a0f2aef-0b0b-4bd6-bb88-cb99ce351416",
+      "lastActiveAt": "2026-03-22T20:02:52.807Z",
+      "isActive": false,
+      "totalTokens": 13899,
+      "cacheTokens": 13048351,
+      "agentTypesInvolved": [
+        "Explore"
+      ]
+    },
+    {
+      "sessionId": "64276cc8-ea64-4522-9a88-567597bf2168",
+      "lastActiveAt": "2026-03-22T19:50:31.168Z",
+      "isActive": false,
+      "totalTokens": 15882,
+      "cacheTokens": 12787381,
+      "agentTypesInvolved": [
+        "Explore"
+      ]
+    },
+    {
+      "sessionId": "e9a36ae0-acbb-441f-a2a8-df929aa3a23a",
+      "lastActiveAt": "2026-03-22T19:05:43.882Z",
+      "isActive": false,
+      "totalTokens": 12207,
+      "cacheTokens": 12268186,
+      "agentTypesInvolved": []
+    },
+    {
+      "sessionId": "50203964-4f32-4adf-a4a9-dfb322ba0b9a",
+      "lastActiveAt": "2026-03-22T18:50:24.686Z",
+      "isActive": false,
+      "totalTokens": 32883,
+      "cacheTokens": 10423210,
+      "agentTypesInvolved": []
+    },
+    {
+      "sessionId": "99d7ef84-9ce7-4185-8ad6-44b5a6c76d29",
+      "lastActiveAt": "2026-03-22T18:00:51.905Z",
+      "isActive": false,
+      "totalTokens": 6000,
+      "cacheTokens": 517753,
+      "agentTypesInvolved": [
+        "Explore",
+        "Plan"
       ]
     }
   ]

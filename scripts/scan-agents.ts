@@ -18,9 +18,11 @@ import matter from 'gray-matter'
 import { calculateCost } from '../src/lib/model-pricing'
 import { extractResponsibilities, extractSkills } from '../src/lib/extract-responsibilities'
 import { getAvatarColor, slugify as _slugify } from '../src/lib/avatar-utils'
+import { parseClaudeLogs } from './parse-claude-logs'
 import type {
   Agent,
   AgentsData,
+  ActivitySession,
   ControlRoomConfig,
   Workflow,
   AgentSourceType,
@@ -397,6 +399,78 @@ function inferRole(name: string, content: string): string {
   return 'AI Agent'
 }
 
+// ─── claude log integration ───────────────────────────────────────────────────
+
+function applyClaudeLogs(agents: Agent[], root: string): ActivitySession[] {
+  const logs = parseClaudeLogs(root)
+  if (!logs) return []
+
+  const totalIn = logs.totalInputTokens
+  const totalOut = logs.totalOutputTokens
+
+  if (totalIn === 0 && totalOut === 0) return []
+
+  // Match subagent types to discovered agents by name/role keywords
+  const matchedInputByAgent: Record<string, number> = {}
+  const matchedOutputByAgent: Record<string, number> = {}
+
+  for (const [agentType, usage] of Object.entries(logs.byAgentType)) {
+    const lower = agentType.toLowerCase()
+    const matched = agents.find((a) => {
+      const n = a.name.toLowerCase()
+      const r = a.role.toLowerCase()
+      if (lower.includes('explore') || lower.includes('research')) return n.includes('research') || r.includes('research')
+      if (lower.includes('code') || lower.includes('engineer')) return n.includes('code') || r.includes('code') || r.includes('engineer')
+      if (lower.includes('write') || lower.includes('writer') || lower.includes('content')) return n.includes('writ') || r.includes('writ') || r.includes('content')
+      if (lower.includes('plan')) return r.includes('plan') || r.includes('orchestrat')
+      return false
+    })
+    if (matched) {
+      matchedInputByAgent[matched.id] = (matchedInputByAgent[matched.id] ?? 0) + usage.inputTokens
+      matchedOutputByAgent[matched.id] = (matchedOutputByAgent[matched.id] ?? 0) + usage.outputTokens
+    }
+  }
+
+  const totalMatchedIn = Object.values(matchedInputByAgent).reduce((s, v) => s + v, 0)
+  const totalMatchedOut = Object.values(matchedOutputByAgent).reduce((s, v) => s + v, 0)
+  const remainderIn = Math.max(0, totalIn - totalMatchedIn)
+  const remainderOut = Math.max(0, totalOut - totalMatchedOut)
+
+  // Give remainder to the main/orchestrator agent, or distribute evenly if none
+  const mainAgent = agents.find((a) => a.sourceType === 'claude-main') ?? agents[0]
+
+  for (const agent of agents) {
+    const inp = (matchedInputByAgent[agent.id] ?? 0) + (agent === mainAgent ? remainderIn : 0)
+    const out = (matchedOutputByAgent[agent.id] ?? 0) + (agent === mainAgent ? remainderOut : 0)
+    if (inp === 0 && out === 0) continue
+
+    agent.compensation = {
+      inputTokens: inp,
+      outputTokens: out,
+      totalTokens: inp + out,
+      estimatedCostUSD: Math.round(calculateCost(inp, out, agent.model) * 10000) / 10000,
+      cacheTokens: agent === mainAgent ? logs.totalCacheTokens : undefined,
+      lastActiveAt: logs.lastActiveAt,
+      isActive: logs.isActive,
+      sessionCount: logs.sessions.length,
+      period: 'all-time',
+    }
+  }
+
+  console.log(`   Claude logs:  ${logs.sessions.length} session(s), ${totalIn + totalOut} tokens total`)
+  if (logs.isActive) console.log(`   ⚡ Active session detected`)
+
+  // Build activity feed (most recent 10 sessions)
+  return logs.sessions.slice(0, 10).map((s) => ({
+    sessionId: s.sessionId,
+    lastActiveAt: s.lastActiveAt,
+    isActive: s.isActive,
+    totalTokens: s.inputTokens + s.outputTokens,
+    cacheTokens: s.cacheTokens,
+    agentTypesInvolved: Array.from(new Set(s.subagents.map((sub) => sub.agentType))),
+  }))
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -532,18 +606,24 @@ async function main() {
   // If no agents found, write sample data so the UI has something to show
   const finalAgents = agentList.length > 0 ? agentList : generateSampleAgents(defaultModel)
 
-  // Auto-import usage data: prefer a local file, fall back to Anthropic Admin API
-  if (config.usageLogPath) {
+  // Auto-import usage data: Claude logs → local file → Anthropic Admin API
+  let recentActivity: ActivitySession[] = []
+  const claudeLogData = applyClaudeLogs(finalAgents, root)
+  if (claudeLogData.length > 0) {
+    recentActivity = claudeLogData
+  } else if (config.usageLogPath) {
     applyUsageLog(finalAgents, config.usageLogPath, root)
   } else {
     await fetchAnthropicUsage(finalAgents)
   }
+
   const finalWorkflows = workflows.length > 0 ? workflows : generateSampleWorkflows()
 
   const output: AgentsData = {
     generatedAt: new Date().toISOString(),
     agents: finalAgents,
     workflows: finalWorkflows,
+    recentActivity,
   }
 
   const outPath = path.join(root, 'src/data/agents.json')

@@ -1,8 +1,9 @@
 import { Users, DollarSign, GitBranch, Cpu, Zap } from 'lucide-react'
-import { getAllAgents, getAllWorkflows, getDashboardStats, getGeneratedAt } from '@/lib/agent-loader'
+import { getAllAgents, getAllWorkflows, getDashboardStats, getGeneratedAt, getRecentActivity } from '@/lib/agent-loader'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { CostOverviewChart } from '@/components/dashboard/CostOverviewChart'
 import { RecentAgentsList } from '@/components/dashboard/RecentAgentsList'
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { TopBar } from '@/components/layout/TopBar'
 import { formatNumber, formatCost } from '@/lib/utils'
 
@@ -11,6 +12,7 @@ export default function DashboardPage() {
   const agents = getAllAgents()
   const workflows = getAllWorkflows()
   const generatedAt = getGeneratedAt()
+  const recentActivity = getRecentActivity()
 
   const topAgent = agents.slice().sort((a, b) => b.compensation.totalTokens - a.compensation.totalTokens)[0]
 
@@ -67,6 +69,9 @@ export default function DashboardPage() {
           </div>
           <RecentAgentsList agents={agents} />
         </div>
+
+        {/* Activity feed */}
+        {recentActivity.length > 0 && <ActivityFeed sessions={recentActivity} />}
 
         {/* Top performer */}
         {topAgent && (
