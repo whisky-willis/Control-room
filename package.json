@@ -1,6 +1,6 @@
 {
   "name": "control-room",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Workday for AI Agents — open-source dashboard for managing and monitoring your AI agent workforce",
   "bin": {
     "control-room": "./bin/control-room.js"
