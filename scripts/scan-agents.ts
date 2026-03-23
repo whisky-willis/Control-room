@@ -43,6 +43,68 @@ function loadConfig(root: string): ControlRoomConfig {
   return { scanPaths: ['.'], defaultModel: 'claude-sonnet-4-6' }
 }
 
+async function fetchAnthropicUsage(agents: Agent[]): Promise<void> {
+  const adminKey = process.env.ANTHROPIC_ADMIN_KEY
+  if (!adminKey) return
+
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setDate(endDate.getDate() - 30)
+  const fmt = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+
+  interface UsageBucket { model?: string; input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
+  interface UsageResponse { data: UsageBucket[]; has_more: boolean; next_page?: string }
+
+  const byModel: Record<string, { inputTokens: number; outputTokens: number }> = {}
+
+  let page: string | undefined
+  do {
+    const url = new URL('https://api.anthropic.com/v1/organizations/usage_report/messages')
+    url.searchParams.set('starting_at', fmt(startDate))
+    url.searchParams.set('ending_at', fmt(endDate))
+    url.searchParams.set('bucket_width', '1d')
+    url.searchParams.append('group_by[]', 'model')
+    if (page) url.searchParams.set('page', page)
+
+    const res = await fetch(url.toString(), {
+      headers: { 'x-api-key': adminKey, 'anthropic-version': '2023-06-01' },
+    })
+    if (!res.ok) {
+      console.warn(`⚠️  Anthropic usage API returned ${res.status}: ${await res.text()}`)
+      return
+    }
+    const body = await res.json() as UsageResponse
+    for (const bucket of body.data) {
+      const model = bucket.model ?? 'unknown'
+      if (!byModel[model]) byModel[model] = { inputTokens: 0, outputTokens: 0 }
+      byModel[model].inputTokens += (bucket.input_tokens ?? 0) + (bucket.cache_read_input_tokens ?? 0)
+      byModel[model].outputTokens += bucket.output_tokens ?? 0
+    }
+    page = body.has_more ? body.next_page : undefined
+  } while (page)
+
+  const totalInput = Object.values(byModel).reduce((s, r) => s + r.inputTokens, 0)
+  const totalOutput = Object.values(byModel).reduce((s, r) => s + r.outputTokens, 0)
+  const agentCount = agents.length || 1
+
+  for (const agent of agents) {
+    const key = Object.keys(byModel).find(
+      (m) => m === agent.model || m.startsWith(agent.model.split('-').slice(0, 3).join('-'))
+    )
+    const inp = key ? byModel[key].inputTokens : Math.round(totalInput / agentCount)
+    const out = key ? byModel[key].outputTokens : Math.round(totalOutput / agentCount)
+    agent.compensation = {
+      inputTokens: inp,
+      outputTokens: out,
+      totalTokens: inp + out,
+      estimatedCostUSD: Math.round(calculateCost(inp, out, agent.model) * 10000) / 10000,
+      period: 'all-time',
+    }
+  }
+
+  console.log(`   Anthropic API: fetched usage for ${Object.keys(byModel).length} model(s)`)
+}
+
 function parseCSV(content: string): Record<string, string>[] {
   const lines = content.trim().split('\n')
   const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'))
@@ -470,9 +532,11 @@ async function main() {
   // If no agents found, write sample data so the UI has something to show
   const finalAgents = agentList.length > 0 ? agentList : generateSampleAgents(defaultModel)
 
-  // Auto-import usage data if configured
+  // Auto-import usage data: prefer a local file, fall back to Anthropic Admin API
   if (config.usageLogPath) {
     applyUsageLog(finalAgents, config.usageLogPath, root)
+  } else {
+    await fetchAnthropicUsage(finalAgents)
   }
   const finalWorkflows = workflows.length > 0 ? workflows : generateSampleWorkflows()
 
